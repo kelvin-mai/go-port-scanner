@@ -71,7 +71,7 @@ func ScanPort(protocol, hostname string, port int) PortResult {
 	return result
 }
 
-func GetOpenPorts(hostname string, ports PortRange) (ScanResult, bool) {
+func ScanPorts(hostname string, ports PortRange) (ScanResult, bool) {
 	var results []PortResult
 	var scanned ScanResult
 	addr, err := net.LookupIP(hostname)
@@ -100,5 +100,14 @@ func DisplayScanResult(result ScanResult) {
 		if v.State {
 			fmt.Printf("%d	%s\n", v.Port, v.Service)
 		}
+	}
+}
+
+func GetOpenPorts(hostname string, ports PortRange) {
+	scanned, ok := ScanPorts(hostname, ports)
+	if ok {
+		DisplayScanResult(scanned)
+	} else {
+		fmt.Println("Error: Invalid IP address")
 	}
 }
