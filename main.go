@@ -1,10 +1,14 @@
 package main
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/kelvin-mai/go-port-scanner/port"
 )
 
 func main() {
+	start := time.Now()
 	port.GetOpenPorts("www.freecodecamp.com", port.PortRange{Start: 75, End: 85})
 
 	// called with ip address
@@ -18,4 +22,6 @@ func main() {
 
 	// verbose called with host name -- multiple ports returned
 	port.GetOpenPorts("scanme.nmap.org", port.PortRange{Start: 20, End: 80})
+	elapsed := time.Since(start)
+	fmt.Printf("Scan duration: %s", elapsed)
 }

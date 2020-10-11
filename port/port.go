@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -57,40 +58,52 @@ var common = map[int]string{
 	8443: "https-alt",
 }
 
-func ScanPort(protocol, hostname string, port int) PortResult {
-	result := PortResult{Port: port}
+func ScanPort(protocol, hostname, service string, port int, resultChannel chan PortResult, wg *sync.WaitGroup) {
+	defer wg.Done()
+	result := PortResult{Port: port, Service: service}
 	address := hostname + ":" + strconv.Itoa(port)
-	conn, err := net.DialTimeout(protocol, address, 60*time.Second)
+	conn, err := net.DialTimeout(protocol, address, 1*time.Second)
 	if err != nil {
 		result.State = false
-		return result
+		resultChannel <- result
+		return
 	}
 	defer conn.Close()
-
 	result.State = true
-	return result
+	resultChannel <- result
+	return
 }
 
-func ScanPorts(hostname string, ports PortRange) (ScanResult, bool) {
+func ScanPorts(hostname string, ports PortRange) (ScanResult, error) {
 	var results []PortResult
 	var scanned ScanResult
+	var wg sync.WaitGroup
+
+	resultChannel := make(chan PortResult, ports.End-ports.Start)
+
 	addr, err := net.LookupIP(hostname)
 	if err != nil {
-		return scanned, false
+		return scanned, err
 	}
 	for i := ports.Start; i <= ports.End; i++ {
-		if v, ok := common[i]; ok {
-			result := ScanPort("tcp", hostname, i)
-			result.Service = v
-			results = append(results, result)
+		if service, ok := common[i]; ok {
+			wg.Add(1)
+			go ScanPort("tcp", hostname, service, i, resultChannel, &wg)
+
 		}
 	}
+	wg.Wait()
+	close(resultChannel)
+	for result := range resultChannel {
+		results = append(results, result)
+	}
+
 	scanned = ScanResult{
 		hostname: hostname,
 		ip:       addr,
 		results:  results,
 	}
-	return scanned, true
+	return scanned, nil
 }
 
 func DisplayScanResult(result ScanResult) {
@@ -104,10 +117,10 @@ func DisplayScanResult(result ScanResult) {
 }
 
 func GetOpenPorts(hostname string, ports PortRange) {
-	scanned, ok := ScanPorts(hostname, ports)
-	if ok {
-		DisplayScanResult(scanned)
+	scanned, err := ScanPorts(hostname, ports)
+	if err != nil {
+		fmt.Println(err)
 	} else {
-		fmt.Println("Error: Invalid IP address")
+		DisplayScanResult(scanned)
 	}
 }
